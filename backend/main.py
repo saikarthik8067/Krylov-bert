@@ -88,12 +88,15 @@ def get_bert_summary(text):
 
 @app.post("/extract")
 async def extract(file: UploadFile = File(...)):
-    if not file.filename.endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Only PDF files are supported")
+    if not (file.filename.endswith(".pdf") or file.filename.endswith(".txt")):
+        raise HTTPException(status_code=400, detail="Only PDF and TXT files are supported")
     try:
         content = await file.read()
-        pdf_file = io.BytesIO(content)
-        text = extract_text_from_pdf(pdf_file)
+        if file.filename.endswith(".pdf"):
+            pdf_file = io.BytesIO(content)
+            text = extract_text_from_pdf(pdf_file)
+        else:
+            text = content.decode("utf-8", errors="ignore")
         return {"text": text}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

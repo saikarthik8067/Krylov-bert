@@ -64,7 +64,11 @@ function App() {
       setBertResult(data);
     } catch (err) {
       console.error(err);
-      alert("BERT Benchmark failed. Check console or server logs.");
+      if (err.message === "Network Error") {
+        alert("Network Error: The backend server (uvicorn) is not running on port 8000.");
+      } else {
+        alert(err.response?.data?.detail || "BERT Benchmark failed. Check console or server logs.");
+      }
     } finally {
       clearInterval(bertIntervalRef.current);
       setBertLoading(false);
@@ -89,7 +93,11 @@ function App() {
       setKrylovResult(data);
     } catch (err) {
       console.error(err);
-      alert("Krylov Benchmark failed. Check console or server logs.");
+      if (err.message === "Network Error") {
+        alert("Network Error: The backend server (uvicorn) is not running on port 8000.");
+      } else {
+        alert(err.response?.data?.detail || "Krylov Benchmark failed. Check console or server logs.");
+      }
     } finally {
       clearInterval(krylovIntervalRef.current);
       setKrylovLoading(false);
@@ -126,7 +134,7 @@ function App() {
             </div>
 
             <div className="file-upload-wrapper">
-              <input type="file" accept=".pdf" onChange={handleFileChange} />
+              <input type="file" accept=".pdf,.txt" onChange={handleFileChange} />
               <div className="file-upload-box">
                 <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
                 <p style={{ color: "var(--text-main)", fontWeight: "600", fontSize: "1.1rem", margin: "0 0 6px 0" }}>
@@ -166,7 +174,7 @@ function App() {
             </div>
 
             <div className="file-upload-wrapper">
-              <input type="file" accept=".pdf" onChange={handleFileChange} />
+              <input type="file" accept=".pdf,.txt" onChange={handleFileChange} />
               <div className="file-upload-box">
                 <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
                 <p style={{ color: "var(--text-main)", fontWeight: "600", fontSize: "1.1rem", margin: "0 0 6px 0" }}>
