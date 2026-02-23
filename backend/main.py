@@ -47,15 +47,14 @@ def get_krylov_summary(text):
     embs = []
     with torch.no_grad():
         for s in sentences:
-            enc = tokenizer(s, return_tensors="pt", truncation=True, padding="max_length", max_length=32)
-            out = krylov_model(enc["input_ids"].to(device))
-            embs.append(out.mean(dim=1).squeeze(0).cpu())
+            enc = tokenizer(s, return_tensors="pt", truncation=True, padding="max_length", max_length=128)
+            out = krylov_model(input_ids=enc["input_ids"].to(device), attention_mask=enc["attention_mask"].to(device))
+            embs.append(out[:, 0, :].squeeze(0).cpu())
     
     if not embs: return "Could not generate embeddings.", 0
     
     embs = torch.stack(embs)
-    doc_emb = embs.mean(dim=0, keepdim=True)
-    scores = F.cosine_similarity(embs, doc_emb)
+    scores = torch.norm(embs, dim=1)
     
     top_k = min(3, len(sentences))
     idx = torch.topk(scores, top_k).indices.tolist()
@@ -76,9 +75,10 @@ def get_bert_summary(text):
             out = bert_model(input_ids=enc["input_ids"].to(device), attention_mask=enc["attention_mask"].to(device))
             embs.append(out.last_hidden_state[:, 0, :].squeeze(0).cpu())
     
+    if not embs: return "Could not generate embeddings.", 0
+    
     embs = torch.stack(embs)
-    doc_emb = embs.mean(dim=0, keepdim=True)
-    scores = F.cosine_similarity(embs, doc_emb)
+    scores = torch.norm(embs, dim=1)
     
     top_k = min(3, len(sentences))
     idx = torch.topk(scores, top_k).indices.tolist()
