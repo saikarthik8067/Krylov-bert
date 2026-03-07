@@ -7,14 +7,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from transformers import AutoTokenizer, BertModel
 import io
+import logging
 from bert_score import score
 
 from model import SpectralKrylovTransformerBlock
 from utils import clean_document, split_into_sentences, extract_text_from_pdf
 
-app = FastAPI()
+# Initialize Logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# Allow frontend to connect
+app = FastAPI(title="Krylov-BERT Full-Stack API")
+
+# Enable CORS for frontend integration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -22,111 +27,109 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Global model state
+# Device Configuration
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased", use_fast=True)
-krylov_model = SpectralKrylovTransformerBlock(vocab_size=tokenizer.vocab_size, d_model=128).to(device)
-krylov_model.eval()
+logger.info(f"Running on Device: {device}")
 
-bert_model = BertModel.from_pretrained("bert-base-uncased").to(device)
-bert_model.eval()
+# Model Loading Registry (Cached at Start)
+tokenizer = None
+krylov_model = None
+bert_model = None
 
-class TextRequest(BaseModel):
+@app.on_event("startup")
+async def load_models():
+    """Initializes models and tokenizers globally at start."""
+    global tokenizer, krylov_model, bert_model
+    try:
+        tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased", use_fast=True)
+        krylov_model = SpectralKrylovTransformerBlock(vocab_size=tokenizer.vocab_size, d_model=128).to(device)
+        krylov_model.eval()
+
+        bert_model = BertModel.from_pretrained("bert-base-uncased").to(device)
+        bert_model.eval()
+        logger.info("All heavy models loaded onto device successfully.")
+    except Exception as e:
+        logger.error(f"Critical error loading models: {str(e)}")
+
+class TextSubmit(BaseModel):
     text: str
 
-class CompareRequest(BaseModel):
+class PairSubmit(BaseModel):
     cand: str
     ref: str
 
-def get_krylov_summary(text):
+def compute_summary(text, mode="krylov"):
+    """Generic summarization logic using model choice."""
     cleaned = clean_document(text)
     sentences = split_into_sentences(cleaned)
-    if not sentences: return "No valid sentences found.", 0
+    if not sentences: return "No valid content.", 0
     
-    start_time = time.time()
+    start = time.time()
     embs = []
+    active_m = krylov_model if mode == "krylov" else bert_model
+    
     with torch.no_grad():
         for s in sentences:
-            enc = tokenizer(s, return_tensors="pt", truncation=True, padding="max_length", max_length=128)
-            out = krylov_model(input_ids=enc["input_ids"].to(device), attention_mask=enc["attention_mask"].to(device))
-            embs.append(out[:, 0, :].squeeze(0).cpu())
+            inputs = tokenizer(s, return_tensors="pt", truncation=True, padding="max_length", max_length=128).to(device)
+            if mode == "krylov":
+                out = krylov_model(input_ids=inputs["input_ids"], attention_mask=inputs["attention_mask"])
+                embs.append(out[:, 0, :].squeeze(0).cpu())
+            else:
+                out = bert_model(input_ids=inputs["input_ids"], attention_mask=inputs["attention_mask"])
+                embs.append(out.last_hidden_state[:, 0, :].squeeze(0).cpu())
     
-    if not embs: return "Could not generate embeddings.", 0
+    if not embs: return "Failed to process text.", 0
     
     embs = torch.stack(embs)
     scores = torch.norm(embs, dim=1)
     
-    top_k = min(3, len(sentences))
-    idx = torch.topk(scores, top_k).indices.tolist()
+    # Pick top 3 sentences for summary
+    k = min(3, len(sentences))
+    idx = torch.topk(scores, k).indices.tolist()
     summary = " ".join([sentences[i] for i in sorted(idx)])
-    duration = time.time() - start_time
+    duration = time.time() - start
     return summary, duration
 
-def get_bert_summary(text):
-    cleaned = clean_document(text)
-    sentences = split_into_sentences(cleaned)
-    if not sentences: return "No valid sentences found.", 0
-    
-    start_time = time.time()
-    embs = []
-    with torch.no_grad():
-        for s in sentences:
-            enc = tokenizer(s, return_tensors="pt", truncation=True, padding="max_length", max_length=128)
-            out = bert_model(input_ids=enc["input_ids"].to(device), attention_mask=enc["attention_mask"].to(device))
-            embs.append(out.last_hidden_state[:, 0, :].squeeze(0).cpu())
-    
-    if not embs: return "Could not generate embeddings.", 0
-    
-    embs = torch.stack(embs)
-    scores = torch.norm(embs, dim=1)
-    
-    top_k = min(3, len(sentences))
-    idx = torch.topk(scores, top_k).indices.tolist()
-    summary = " ".join([sentences[i] for i in sorted(idx)])
-    duration = time.time() - start_time
-    return summary, duration
+@app.get("/health")
+def health():
+    return {"status": "ok", "device": str(device)}
 
 @app.post("/extract")
-async def extract(file: UploadFile = File(...)):
+async def extract_api(file: UploadFile = File(...)):
+    """Receives PDF/TXT and extracts cleansed text."""
     if not (file.filename.endswith(".pdf") or file.filename.endswith(".txt")):
-        raise HTTPException(status_code=400, detail="Only PDF and TXT files are supported")
+        raise HTTPException(status_code=400, detail="Use PDF or TXT only.")
     try:
         content = await file.read()
         if file.filename.endswith(".pdf"):
-            pdf_file = io.BytesIO(content)
-            text = extract_text_from_pdf(pdf_file)
+            text = extract_text_from_pdf(io.BytesIO(content))
         else:
             text = content.decode("utf-8", errors="ignore")
-        return {"text": text}
+        return {"text": text, "count": len(text)}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/bert")
-async def bert_api(req: TextRequest):
-    try:
-        summary, duration = get_bert_summary(req.text)
-        return {"summary": summary, "time": duration}
-    except Exception as e:
+        logger.error(f"Extraction failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/krylov")
-async def krylov_api(req: TextRequest):
-    try:
-        summary, duration = get_krylov_summary(req.text)
-        return {"summary": summary, "time": duration}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+async def run_krylov(req: TextSubmit):
+    """Processes text with Spectral Krylov Block Attention."""
+    summ, dt = compute_summary(req.text, mode="krylov")
+    return {"summary": summ, "time": dt}
+
+@app.post("/bert")
+async def run_bert(req: TextSubmit):
+    """Benchmarks against standard BERT baseline."""
+    summ, dt = compute_summary(req.text, mode="baseline")
+    return {"summary": summ, "time": dt}
 
 @app.post("/compare")
-async def compare_api(req: CompareRequest):
+async def compare_api(req: PairSubmit):
+    """Computes BERTScore similarity metric."""
     try:
-        P, R, F10 = score([req.cand], [req.ref], lang="en", verbose=False)
-        return {
-            "precision": float(P[0]),
-            "recall": float(R[0]),
-            "f1": float(F10[0])
-        }
+        P, R, F1 = score([req.cand], [req.ref], lang="en", verbose=False)
+        return {"precision": float(P[0]), "recall": float(R[0]), "f1": float(F1[0])}
     except Exception as e:
+        logger.error(f"Metric failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":

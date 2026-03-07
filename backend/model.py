@@ -33,6 +33,7 @@ class BlockLanczos(nn.Module):
     def forward(self, X):
         L, _ = X.shape
         k = min(self.k, L)
+        # Numerical stability handling for Lanczos
         basis = torch.randn(L, k, device=X.device)
         basis, _ = torch.linalg.qr(basis)
         T = torch.randn(k, k, device=X.device)
@@ -66,7 +67,12 @@ class SpectralKrylovTransformerBlock(nn.Module):
     def forward(self, input_ids, attention_mask=None):
         x = self.emb(input_ids)
         Q, K, V = self.qkv(x)
-        Qb, Kb, Vb = Q[0], K[0], V[0]
+        # Simplify for sentence-level processing
+        if Q.dim() == 3:
+            Qb, Kb, Vb = Q[0], K[0], V[0]
+        else:
+            Qb, Kb, Vb = Q, K, V
+            
         BQ, TQ, _ = self.lanczos(Qb)
         Zk, _ = self.krylov(BQ, BQ, BQ, TQ, TQ, TQ)
         Z = self.out_proj(Zk)

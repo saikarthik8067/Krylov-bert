@@ -1,0 +1,9 @@
+fastapi>=0.109.0
+uvicorn>=0.27.0
+torch>=2.1.2
+transformers>=4.37.0
+pydantic>=2.0.0
+pydantic-core>=2.14.0
+pypdf2>=3.0.1
+bert-score>=0.3.13
+python-multipart>=0.0.6
