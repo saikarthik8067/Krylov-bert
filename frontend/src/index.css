@@ -1,0 +1,77 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* Palette */
+  --c-bg:        #03040a;
+  --c-bg1:       #080c18;
+  --c-bg2:       #0d1425;
+  --c-surface:   #111827;
+  --c-surface2:  #1a2236;
+  --c-border:    rgba(255,255,255,0.06);
+  --c-border2:   rgba(255,255,255,0.10);
+
+  --c-cyan:      #00f5ff;
+  --c-cyan2:     #00c8d4;
+  --c-violet:    #a78bfa;
+  --c-violet2:   #7c3aed;
+  --c-green:     #10b981;
+  --c-amber:     #f59e0b;
+  --c-rose:      #f43f5e;
+
+  --c-text:      #e2e8f0;
+  --c-text2:     #94a3b8;
+  --c-text3:     #475569;
+
+  /* Glow */
+  --glow-cyan:   0 0 40px rgba(0,245,255,0.18);
+  --glow-violet: 0 0 40px rgba(167,139,250,0.18);
+  --glow-sm:     0 2px 16px rgba(0,0,0,0.5);
+  --glow-lg:     0 8px 48px rgba(0,0,0,0.6);
+
+  /* Typography */
+  --font-ui:     'Space Grotesk', 'Inter', system-ui, sans-serif;
+  --font-mono:   'JetBrains Mono', 'Courier New', monospace;
+
+  /* Radius */
+  --r-sm: 8px; --r-md: 14px; --r-lg: 20px; --r-xl: 28px; --r-2xl: 36px;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font-ui);
+  background: var(--c-bg);
+  color: var(--c-text);
+  min-height: 100vh;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+::selection { background: rgba(0,245,255,0.2); color: var(--c-cyan); }
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: var(--c-bg); }
+::-webkit-scrollbar-thumb { background: var(--c-surface2); border-radius: 99px; }
+
+/* ── Global Keyframes ── */
+@keyframes fadeUp   { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+@keyframes fadeIn   { from { opacity:0; } to { opacity:1; } }
+@keyframes spin     { to { transform:rotate(360deg); } }
+@keyframes shimmer  { 0%{background-position:-400px 0} 100%{background-position:400px 0} }
+@keyframes pulse    { 0%,100%{opacity:1} 50%{opacity:0.4} }
+@keyframes blink    { 0%,100%{opacity:1} 50%{opacity:0} }
+@keyframes float    { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+@keyframes scanline { 0%{transform:translateY(-100%)} 100%{transform:translateY(100vh)} }
+@keyframes gridMove { 0%{transform:translateY(0)} 100%{transform:translateY(60px)} }
+@keyframes fillBar  { from{width:0} to{width:var(--w)} }
+@keyframes counterUp{ from{opacity:0;transform:scale(0.7)} to{opacity:1;transform:scale(1)} }
+@keyframes borderGlow {
+  0%,100% { border-color: rgba(0,245,255,0.2); box-shadow: none; }
+  50%      { border-color: rgba(0,245,255,0.5); box-shadow: 0 0 20px rgba(0,245,255,0.15); }
+}
+@keyframes slidein {
+  from { opacity:0; transform:translateX(-16px); }
+  to   { opacity:1; transform:translateX(0); }
+}
