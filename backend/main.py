@@ -12,11 +12,13 @@ from bert_score import score
 from model import SpectralKrylovTransformerBlock
 from utils import clean_document, split_into_sentences, extract_text_from_pdf
 
-# ✅ App init
+# =========================
+
+# 🔹 APP INIT
+
+# =========================
 
 app = FastAPI(title="KryloBERT API 🚀")
-
-# ✅ CORS (allow frontend)
 
 app.add_middleware(
 CORSMiddleware,
@@ -26,31 +28,16 @@ allow_methods=["*"],
 allow_headers=["*"],
 )
 
-# ✅ Device setup
-
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# ✅ Load models ONCE (important)
+# =========================
+
+# 🔹 LOAD MODELS
+
+# =========================
 
 try:
-    tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
-
-    krylov_model = SpectralKrylovTransformerBlock(
-        vocab_size=tokenizer.vocab_size,
-        d_model=128
-    ).to(device)
-    krylov_model.eval()
-
-    bert_model = BertModel.from_pretrained("bert-base-uncased").to(device)
-    bert_model.eval()
-
-    print("✅ Models loaded successfully")
-
-except Exception as e:
-    print("❌ Model loading failed:", e)
-    tokenizer = None
-    krylov_model = None
-    bert_model = None
+tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
 
 ```
 krylov_model = SpectralKrylovTransformerBlock(
@@ -71,7 +58,11 @@ tokenizer = None
 krylov_model = None
 bert_model = None
 
-# ✅ Request schemas
+# =========================
+
+# 🔹 REQUEST MODELS
+
+# =========================
 
 class TextRequest(BaseModel):
 text: str
@@ -80,7 +71,11 @@ class CompareRequest(BaseModel):
 cand: str
 ref: str
 
-# ✅ Health check
+# =========================
+
+# 🔹 HEALTH CHECK
+
+# =========================
 
 @app.get("/")
 def health():
@@ -118,9 +113,6 @@ try:
             )
             out = krylov_model(enc["input_ids"].to(device))
             embs.append(out.mean(dim=1).squeeze(0).cpu())
-
-    if not embs:
-        return "Embedding failed", 0
 
     embs = torch.stack(embs)
     doc_emb = embs.mean(dim=0, keepdim=True)
