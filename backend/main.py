@@ -33,7 +33,24 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # ✅ Load models ONCE (important)
 
 try:
-tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+    tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+
+    krylov_model = SpectralKrylovTransformerBlock(
+        vocab_size=tokenizer.vocab_size,
+        d_model=128
+    ).to(device)
+    krylov_model.eval()
+
+    bert_model = BertModel.from_pretrained("bert-base-uncased").to(device)
+    bert_model.eval()
+
+    print("✅ Models loaded successfully")
+
+except Exception as e:
+    print("❌ Model loading failed:", e)
+    tokenizer = None
+    krylov_model = None
+    bert_model = None
 
 ```
 krylov_model = SpectralKrylovTransformerBlock(
